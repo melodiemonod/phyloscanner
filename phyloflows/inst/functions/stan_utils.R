@@ -1,4 +1,4 @@
-ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL,M=30,D=2){
+ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL,M=30,D=2,outdir){
   
   require(data.table)	
   #
@@ -15,16 +15,16 @@ ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL
   }
   if(is.null(infile.inference))
   {
-    infile.inference	<- "~/ageanalysis/RakaiAll_output_190327_w250_s20_p25_d50_stagetwo_rerun23_min30_conf60_phylogeography_data_with_inmigrants.rda"
+    infile.inference	<- file.path(outdir, "RakaiAll_output_190327_w250_s20_p25_d50_stagetwo_rerun23_min30_conf60_phylogeography_data_with_inmigrants.rda")
   }
   if(is.null(infile.prior.samples))
   {
-    infile.prior.samples <- "~/ageanalysis/samples_fit.rda"
+    infile.prior.samples <- file.path(outdir,"samples_fit.rda")
   }
-
+  
   cat('\ninfile.inference=',infile.inference)
   cat('\ninfile.prior.samples=',infile.prior.samples)
-
+  
   cat('\nopt=',unlist(opt))			
   indir					<- dirname(infile.inference)	
   outfile.base			<- '~/ageanalysis/'
@@ -195,7 +195,7 @@ ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL
   setkey(dobs,OUTPUT_ID,TR_SMOOTH_CATEGORY,REC_SMOOTH_CATEGORY)	
   dobs[, TRM_CAT_PAIR_ID:= seq_len(nrow(dobs))]
   setkey(dobs, TRM_CAT_PAIR_ID)
-
+  
   # sampling prior
   load(infile.prior.samples)
   set(dprior.fit, NULL, 'SAMPLING_CATEGORY', dprior.fit[, gsub('^2','e',gsub('^1','f',gsub('^0','i',SAMPLING_CATEGORY)))] )		
@@ -214,10 +214,10 @@ ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL
   tmp <- merge(tmp,subset(dprior.id[REC_WHO=='REC_SAMPLING_CATEGORY',],select=c('REC_ID','REC_SAMPLING_CATEGORY')),by='REC_SAMPLING_CATEGORY',all.x = TRUE)
   setkey(tmp, TRM_CAT_PAIR_ID)
   xi_id <- cbind(tmp$TR_ID, tmp$REC_ID)
-
+  
   setkey(dprior.fit,SAMPLING_CATEGORY,WHO)
   
-
+  
   indices <- matrix(NA, M^D, D)
   mm=0;
   for (m1 in 1:M){
@@ -226,7 +226,7 @@ ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL
       indices[mm,] = c(m1, m2)
     }
   }
-
+  
   B1 <- max(dobs$TR_SMOOTH_CATEGORY)
   B2 <- max(dobs$REC_SMOOTH_CATEGORY)
   L <-  matrix(rep(c(B1, B2) * 5/4,each=nrow(indices)),nrow=nrow(indices))
@@ -265,9 +265,131 @@ ageanalysis <- function(infile.inference=NULL,infile.prior.samples=NULL,opt=NULL
                    id_se =  dobs[grepl('e:',TR_TRM_CATEGORY),unique(OUTPUT_ID)]
   )
   
-  save(data.fit,file='~/ageanalysis/input.rda')
+  save(data.fit,file=file.path(outdir, 'input.rda'))
+  
+  return(data.fit)
+}
 
+prepare_stan_data <- function(pairs, age_map){
+  stan_data = list()
+  
+  # number of directions
+  stan_data[['N_group']] = 2
+  
+  # f -> M
+  tmp <- pairs[sex.SOURCE == 'F' & sex.RECIPIENT == 'M']
+  tmp <- tmp[, list(age_infection.SOURCE = floor(age_infection.SOURCE), age_infection.RECIPIENT = floor(age_infection.RECIPIENT))]
+  tmp <- tmp[, list(count = .N), by = c('age_infection.SOURCE', 'age_infection.RECIPIENT')]
+  tmp <- merge(age_map, tmp, by = c('age_infection.SOURCE', 'age_infection.RECIPIENT'), all.x = T)
+  tmp[is.na(count), count := 0]
+  stopifnot(sum(tmp$count) == nrow(pairs[sex.SOURCE == 'F' & sex.RECIPIENT == 'M']))
+  stopifnot(all(tmp$age_infection.SOURCE == age_map$age_infection.SOURCE))
+  stopifnot(all(tmp$age_infection.RECIPIENT == age_map$age_infection.RECIPIENT))
+  stan_data[['y']] = matrix(tmp$count, ncol = 1)
+  stan_data[['is_mf']] = 0
+  
+  # M -> F
+  tmp <- pairs[sex.SOURCE == 'M' & sex.RECIPIENT == 'F']
+  tmp <- tmp[, list(age_infection.SOURCE = floor(age_infection.SOURCE), age_infection.RECIPIENT = floor(age_infection.RECIPIENT))]
+  tmp <- tmp[, list(count = .N), by = c('age_infection.SOURCE', 'age_infection.RECIPIENT')]
+  tmp <- merge(age_map, tmp, by = c('age_infection.SOURCE', 'age_infection.RECIPIENT'), all.x = T)
+  tmp[is.na(count), count := 0]
+  stopifnot(sum(tmp$count) == nrow(pairs[sex.SOURCE == 'M' & sex.RECIPIENT == 'F']))
+  stopifnot(all(tmp$age_infection.SOURCE == age_map$age_infection.SOURCE))
+  stopifnot(all(tmp$age_infection.RECIPIENT == age_map$age_infection.RECIPIENT))
+  stan_data[['y']] = cbind(stan_data[['y']], matrix(tmp$count, ncol = 1))
+  stan_data[['is_mf']] = c(stan_data[['is_mf']], 1)
+  
+  # age age entries
+  stan_data[['N_per_group']] = nrow(age_map)
+
+  return(stan_data)
 }
 
 
+add_2D_splines_stan_data = function(stan_data, spline_degree = 3, n_knots_rows = 8, n_knots_columns = 8, AGES)
+{
+  
+  stan_data$A <- length(AGES)
+  
+  knots_rows = AGES[seq(1, length(AGES), length.out = n_knots_rows)] 
+  knots_columns = AGES[seq(1, length(AGES), length.out = n_knots_columns)]
+  
+  stan_data$num_basis_rows = length(knots_rows) + spline_degree - 1
+  stan_data$num_basis_columns = length(knots_columns) + spline_degree - 1
+  
+  stan_data$IDX_BASIS_ROWS = 1:stan_data$num_basis_rows
+  stan_data$IDX_BASIS_COLUMNS = 1:stan_data$num_basis_columns
+  
+  stan_data$BASIS_ROWS = bsplines(AGES, knots_rows, spline_degree)
+  stan_data$BASIS_COLUMNS = bsplines(AGES, knots_columns, spline_degree)
+  
+  stopifnot(all( apply(stan_data$BASIS_ROWS, 1, sum) > 0  ))
+  stopifnot(all( apply(stan_data$BASIS_COLUMNS, 1, sum) > 0  ))
+  
+  return(stan_data)
+}
+
+bspline = function(x, k, order, intervals)
+{
+  
+  if(order == 1){
+    return(x >= intervals[k] & x < intervals[k+1])
+  }
+  
+  w1 = 0; w2 = 0
+  
+  if(intervals[k] != intervals[k+order-1])
+    w1 = (x - intervals[k]) / (intervals[k+order-1] - intervals[k])
+  if(intervals[k+1] != intervals[k+order])
+    w2 = 1 - (x - intervals[k+1]) / (intervals[k+order] - intervals[k+1])
+  
+  spline = w1 * bspline(x, k, order - 1, intervals) +
+    w2 * bspline(x, k+1, order - 1, intervals)
+  
+  return(spline)
+}
+
+find_intervals = function(knots, degree, repeating = T)
+{
+  
+  K = length(knots)
+  
+  intervals = vector(mode = 'double', length = 2*degree + K)
+  
+  # support of knots
+  intervals[(degree+1):(degree+K)] = knots
+  
+  # extreme
+  if(repeating)
+  {
+    intervals[1:degree] = min(knots)
+    intervals[(degree+K+1):(2*degree+K)] = max(knots)
+  } else {
+    gamma = 0.1
+    intervals[1:degree] = min(knots) - gamma*degree:1
+    intervals[(degree+K+1):(2*degree+K)] = max(knots) + gamma*1:degree
+  }
+  
+  return(intervals)
+}
+
+bsplines = function(data, knots, degree)
+{
+  K = length(knots)
+  num_basis = K + degree - 1
+  
+  intervals = find_intervals(knots, degree)
+  
+  m = matrix(nrow = num_basis, ncol = length(data), 0)
+  
+  for(k in 1:num_basis)
+  {
+    m[k,] = bspline(data, k, degree + 1, intervals) 
+  }
+  
+  m[num_basis,length(data)] = 1
+  
+  return(m)
+}
 

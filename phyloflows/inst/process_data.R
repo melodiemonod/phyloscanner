@@ -7,10 +7,22 @@ library(ggpubr)
 library(knitr)
 
 # change as appropriate
-indir.repository <- '~/git/phyloscanner/phyloflows/inst'
-indir.deepsequence_analyses <- '~/Box\ Sync/2021/ratmann_deepseq_analyses/live/PANGEA2_RCCS1519_UVRI/'
-indir.deepsequencedata <- '~/Box\ Sync/2019/ratmann_pangea_deepsequencedata/live/'
-outdir <- '~/Box\ Sync/2021/phyloflows/'
+if(dir.exists('~/Box\ Sync/2021/ratmann_deepseq_analyses/'))
+{
+  indir.repository <- '~/git/phyloscanner/phyloflows/inst'
+  indir.deepsequence_analyses <- '~/Box\ Sync/2021/ratmann_deepseq_analyses/live/PANGEA2_RCCS1519_UVRI/'
+  indir.deepsequencedata <- '~/Box\ Sync/2019/ratmann_pangea_deepsequencedata/live/'
+  outdir <- '~/Box\ Sync/2021/phyloflows/'
+}
+if(dir.exists('~/Documents/PANGEA2_RCCS1519_UVRI/'))
+{
+  indir.repository <-'~/git/phyloscanner/phyloflows/inst'
+  indir.deepsequence_analyses   <- '~/Documents/PANGEA2_RCCS1519_UVRI/'
+  indir.deepsequence_analyses_MRC   <- '~/Documents/PANGEA2_MRCUVRI'
+  indir.deepsequencedata <- '~/Documents/ratmann_pangea_deepsequencedata/'
+  outdir <- '~/Documents/RCCS/outputs'
+  
+}
 
 # indicators 
 include.mrc <- F

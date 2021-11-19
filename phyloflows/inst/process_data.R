@@ -7,10 +7,22 @@ library(ggpubr)
 library(knitr)
 
 # change as appropriate
-indir.repository <- '~/git/phyloscanner/phyloflows/inst'
-indir.deepsequence_analyses <- '~/Box\ Sync/2021/ratmann_deepseq_analyses/live/PANGEA2_RCCS1519_UVRI/'
-indir.deepsequencedata <- '~/Box\ Sync/2019/ratmann_pangea_deepsequencedata/live/'
-outdir <- '~/Box\ Sync/2021/phyloflows/'
+if(dir.exists('~/Box\ Sync/2021/ratmann_deepseq_analyses/'))
+{
+  indir.repository <- '~/git/phyloscanner/phyloflows/inst'
+  indir.deepsequence_analyses <- '~/Box\ Sync/2021/ratmann_deepseq_analyses/live/PANGEA2_RCCS1519_UVRI/'
+  indir.deepsequencedata <- '~/Box\ Sync/2019/ratmann_pangea_deepsequencedata/live/'
+  outdir <- '~/Box\ Sync/2021/phyloflows/'
+}
+if(dir.exists('~/Documents/PANGEA2_RCCS1519_UVRI/'))
+{
+  indir.repository <-'~/git/phyloscanner/phyloflows/inst'
+  indir.deepsequence_analyses   <- '~/Documents/PANGEA2_RCCS1519_UVRI/'
+  indir.deepsequence_analyses_MRC   <- '~/Documents/PANGEA2_MRCUVRI'
+  indir.deepsequencedata <- '~/Documents/ratmann_pangea_deepsequencedata/'
+  outdir <- '~/Documents/RCCS/outputs'
+  
+}
 
 # indicators 
 include.mrc <- F
@@ -32,6 +44,7 @@ outdir.lab <- file.path(outdir, lab); dir.create(outdir.lab)
 source(file.path(indir.repository, 'functions', 'summary_functions.R'))
 source(file.path(indir.repository, 'functions', 'plotting_functions.R'))
 source(file.path(indir.repository, 'functions', 'stan_utils.R'))
+source(file.path(indir.repository, 'functions', 'check_potential_TNet.R'))
 
 # load files
 load(file.path.chains.data)
@@ -41,7 +54,7 @@ meta.rccs.2 <- as.data.table( read.csv(file.path.meta.data.rccs.2))
 meta.mrc <- as.data.table( read.csv(file.path.meta.data.mrc))
 
 # load keys
-anonymisation.keys <- read.csv(file.anonymisation.keys)
+anonymisation.keys <- as.data.table(read.csv(file.anonymisation.keys))
 community.keys <- as.data.table( read.csv(file.community.keys) )
 time.first.positive <- as.data.table( read.csv(file.time.first.positive) )
 
@@ -50,6 +63,9 @@ meta_data <- get.meta.data(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positi
 
 # get likely transmission pairs
 chain <- keep.likely.transmission.pairs(as.data.table(dchain), threshold.likely.connected.pairs)
+
+# study whether couple found in previous analyses are included in the same Potential Transmission Network cluster.
+print.statements.about.potential.TNet()
 
 # merge meta data to source and recipient
 pairs <- pairs.get.meta.data(chain, meta_data)
@@ -64,6 +80,7 @@ if(include.only.heterosexual.pairs){
 }
 
 print.statements.about.pairs(copy(pairs), outdir.lab)
+
 
 # keep only pairs with source-recipient with proxy for the time of infection
 pairs <- pairs[!is.na(age_infection.SOURCE) & !is.na(age_infection.RECIPIENT)]

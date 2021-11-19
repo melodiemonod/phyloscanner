@@ -150,12 +150,17 @@ print.statements.about.pairs <- function(pairs, outdir){
 print_table <- function(table) print(knitr::kable(table))
 
 get.age.map <- function(pairs){
+  
   ages <- pairs[, {
     min_age = floor(min(c(age_infection.SOURCE, age_infection.RECIPIENT)))
     max_age = floor(max(c(age_infection.SOURCE, age_infection.RECIPIENT)))
     list(age = min_age:max_age)}]
-  
-  
   age_map <- data.table(expand.grid(age_infection.SOURCE = ages$age, age_infection.RECIPIENT = ages$age))
-  age_map <- age_map[order(age_infection.SOURCE, age_infection.RECIPIENT)]
+  df_age <- age_map[order(age_infection.SOURCE, age_infection.RECIPIENT)]
+  
+  ages <- sort(unique(df_age$age_infection.SOURCE)); length.age = 4
+  ages <- data.table(age_infection = ages, age_infection_reduced.SOURCE = rep(seq(min(ages), max(ages), length.age), each = length.age )[1:length(ages)])
+  df_age <- merge(df_age, ages, by.x = 'age_infection.SOURCE', by.y = 'age_infection')
+  setnames(ages, 'age_infection_reduced.SOURCE', 'age_infection_reduced.RECIPIENT')
+  df_age <<- merge(df_age, ages, by.x = 'age_infection.RECIPIENT', by.y = 'age_infection')
 }

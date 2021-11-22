@@ -21,25 +21,36 @@ make.cluster.assignments <- function()
 
 print.statements.about.potential.TNet <- function()
 {
-  cat('POTENTIAL TRANSMISSION NETWORK: Comparison with R15-16 analysis:\n')
-  print.statements.about.potential.TNet.rakai1516()
-  
-  cat('POTENTIAL TRANSMISSION NETWORK: Comparison with Nicholas Bossa MRC analysis:\n')
-  print.statements.about.potential.TNet.MRC()
+  cat('\n--------------\n\n')
+  file.path.rakai1516 <- file.path(indir.deepsequencedata, 'RakaiAll_output_190327_w250_s20_p25_d50_stagetwo_rerun23_min30_conf60_phylogeography_data_with_inmigrants.rda')
+  file.path.chains.data.MRC <- file.path( indir.deepsequence_analyses_MRC, 'MRCPopSample_phsc_stage2_output_newali_250_HKC_phsc', 'MRC_phscnetworks.rda')
+
+  if (!file.exists(file.path.rakai1516))
+  {
+    break('Cannot find Rakai 15-16 potential networks "RakaiAll_..._with_inmigrants.rda", ask Andrea\n')
+  }else{
+    cat('POTENTIAL TRANSMISSION NETWORK: Comparison with R15-16 analysis:\n')
+    print.statements.about.potential.TNet.rakai1516(file.path.rakai1516)
+  }
+
+  if (!file.exists(file.path.chains.data.MRC))
+  {
+    break('Cannot find MRC potential networks "MRC_phscnetworks.rda", ask Andrea\n')
+  }else{
+    cat('POTENTIAL TRANSMISSION NETWORK: Comparison with Nicholas Bossa MRC analysis:\n')
+    print.statements.about.potential.TNet.MRC(file.path.chains.data.MRC)
+  }
+
+  cat('\n--------------\n\n')
 }
 
 
-print.statements.about.potential.TNet.rakai1516 <- function()
+print.statements.about.potential.TNet.rakai1516 <- function(filename)
 {
   ### Rakai pairs, R15-16 from Phyloscanner's paper
 
   # Load
-  file.path.rakai1516 <- file.path(indir.deepsequencedata, 'RakaiAll_output_190327_w250_s20_p25_d50_stagetwo_rerun23_min30_conf60_phylogeography_data_with_inmigrants.rda')
-  if (!file.exists(file.path.rakai1516))
-  {
-    stop('Cannot find MRC potential networks "RakaiAll_..._with_inmigrants.rda", ask Andrea\n')
-  }
-  load(file.path.rakai1516)
+  load(filename)
   
   # get pairs 
   rtpdm <- as.data.table(rtpdm)
@@ -84,34 +95,27 @@ print.statements.about.potential.TNet.rakai1516 <- function()
 
 
 
-print.statements.about.potential.TNet.MRC <- function(coverage_threshold = 0.5)
+print.statements.about.potential.TNet.MRC <- function(filename, coverage_threshold = 0.95)
 {
-  cat('Using a coverage threshold of', coverage_threshold, ':\n')
-  
-  # MRC pairs from Nicholas Bossa's analysis:
-  file.path.chains.data.MRC <- file.path( indir.deepsequence_analyses_MRC, 'MRCPopSample_phsc_stage2_output_newali_250_HKC_phsc', 'MRC_phscnetworks.rda')
-  if (!file.exists(file.path.chains.data.MRC))
-  {
-    stop('Cannot find MRC potential networks "MRC_phscnetworks.rda", ask Andrea\n')
-  }
-  load(file.path.chains.data.MRC)
+  cat('Using a coverage threshold of', coverage_threshold, ' and a transmission given linkage threshold of 0.6:\n')
   
   # Get likely transmission pairs from Nicholas' analysis
   env <- new.env(parent = emptyenv())
-  load(file.path.chains.data.MRC, envir=env)
+  load(filename, envir=env)
   dchain.MRC <- as.data.table(env$dchain)
   rm(env)
   
-  # Only keep pairs with a given coverage threshold
+  # Only keep pairs with a given coverage threshold (I dont think direction should be determined with the same threshold right?)
   dchain.MRC <- dchain.MRC[SCORE_LINKED>coverage_threshold]
-  dchain.MRC[SCORE_DIR_12 <= coverage_threshold & SCORE_DIR_21 <= coverage_threshold, EST_DIR:='unclear']
-  dchain.MRC[SCORE_DIR_12 > coverage_threshold, EST_DIR:='12']
-  dchain.MRC[SCORE_DIR_21 > coverage_threshold, EST_DIR:='21']
+  dchain.MRC[SCORE_DIR_12 <= 0.6 & SCORE_DIR_21 <= 0.6, EST_DIR:='unclear'] # need threshold for direction of transmission given linkage
+  dchain.MRC[SCORE_DIR_12 > 0.6, EST_DIR:='12'] 
+  dchain.MRC[SCORE_DIR_21 > 0.6, EST_DIR:='21']
   
   # find source recipient
   cat('Out of ', nrow(dchain.MRC), 'pairs in the NBs analysis:\n',
       '- ',nrow(dchain.MRC[EST_DIR == 'unclear']), ' have unclear direction of transmission.\n')
-  # dchain.MRC <- dchain.MRC[EST_DIR != 'unclear']
+  
+  # Keep unclear. Names of SOURCE-RECIPIENT are for convenience and do not necessarily imply direction
   dchain.MRC[, `:=` (SOURCE=H1, RECIPIENT=H2)]
   dchain.MRC[EST_DIR == '21', `:=` (SOURCE=H2, RECIPIENT=H1) ]
   dchain.MRC[, `:=` (H1=NULL, H2=NULL)]
@@ -121,15 +125,12 @@ print.statements.about.potential.TNet.MRC <- function(coverage_threshold = 0.5)
   tmp1 <- meta.mrc[,.(pangea_id, pt_id)]
   cat(' - ',sum(!tmp %in% tmp1$pangea_id), ' out of ', length(tmp), ' individuals did not have an Anonymised ID (were not included in our analysis)\n')
   
-
-  
   dchain.MRC <- change.MRC.IDtype(dchain.MRC)
   pairs <- dchain.MRC[!(is.na(SOURCE) | is.na(RECIPIENT))]
   pairs <- pairs[,.(RECIPIENT, SOURCE)] 
   cat('Out of ', nrow(pairs), 'pairs with well defined AID:\n',
       '- ',nrow(dchain.MRC[EST_DIR == 'unclear']), ' have unclear direction of transmission.\n')
-  
-  
+
   # Now can look if all pairs are in the same clusters
   tmp <- file.path(outdir, 'R1519MRC_cluster_assignments.rds')
   if(!file.exists(tmp))
@@ -141,7 +142,6 @@ print.statements.about.potential.TNet.MRC <- function(coverage_threshold = 0.5)
   cluster_assignments <- cluster_assignments[, list(PTY_RUN1 = PTY_RUN[1], PTY_RUN2 = PTY_RUN[2], PTY_RUN3=PTY_RUN[3], PTY_RUN4=PTY_RUN[4]) ,by = 'AID']
 
   # For each pair, find cluster for RECIPIENT AND SOURCE
- 
   pairs <- merge(pairs, cluster_assignments, by.x='RECIPIENT', by.y='AID', all.x=TRUE)
   tmp <-  grep('^PTY_RUN',colnames(pairs), value=TRUE)
   setnames(pairs, tmp, paste0(tmp, '_RECIPIENT'))
@@ -151,12 +151,11 @@ print.statements.about.potential.TNet.MRC <- function(coverage_threshold = 0.5)
   setnames(pairs, tmp, paste0(tmp, '_SOURCE'))
   
 
-  
   # Want intersection of PTY_RUN1:4_sce and PTY_RUN1:4_rec to be non-empty!
   pairs[,same_cluster := 0 < length(intersect(c(PTY_RUN1_RECIPIENT, PTY_RUN2_RECIPIENT, PTY_RUN3_RECIPIENT, PTY_RUN4_RECIPIENT),
                                                   c(PTY_RUN1_SOURCE,  PTY_RUN2_SOURCE, PTY_RUN3_SOURCE, PTY_RUN4_SOURCE))),]
   
-  
+
   cat(' - ', nrow(pairs[same_cluster == TRUE]),  'pairs were classified in the same possible transmission network cluster at least once.\n')
 }
 

@@ -14,7 +14,7 @@ stan_model <- 'gp_211117'
 DEBUG <- F
 
 path.to.stan.data <- file.path(.outdir, paste0("stanin_",lab,".RData"))
-path.to.stan.model <- file.path(indir, 'stan_models', paste0(stan_model, '.stan'))
+path.to.stan.model <- file.path(.indir, 'stan_models', paste0(stan_model, '.stan'))
 
 load(path.to.stan.data)
 indir <- .indir; outdir <- .outdir; outdir.lab <- file.path(outdir, lab)

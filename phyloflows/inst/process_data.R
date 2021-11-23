@@ -5,7 +5,7 @@ library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(knitr)
-
+  
 # change as appropriate
 if(dir.exists('~/Box\ Sync/2021/ratmann_deepseq_analyses/'))
 {
@@ -21,7 +21,6 @@ if(dir.exists('~/Documents/PANGEA2_RCCS1519_UVRI/'))
   indir.deepsequence_analyses_MRC   <- '~/Documents/PANGEA2_MRCUVRI'
   indir.deepsequencedata <- '~/Documents/ratmann_pangea_deepsequencedata/'
   outdir <- '~/Documents/RCCS/outputs'
-  
 }
 
 # indicators 
@@ -53,10 +52,41 @@ meta.rccs.1 <- as.data.table(rccsData)
 meta.rccs.2 <- as.data.table( read.csv(file.path.meta.data.rccs.2))
 meta.mrc <- as.data.table( read.csv(file.path.meta.data.mrc))
 
+# env_rakai1516 <-  new.env(parent = emptyenv())
+# load(file.path.rakai1516, envir=env_rakai1516)
+# rtpdm <- as.data.table(env_rakai1516$rtpdm)
+# env_MRC <-  new.env(parent = emptyenv())
+# load(file.path.chains.data.MRC, envir=env_MRC)
+# dchain.MRC <- as.data.table(env_MRC$dchain)
+# mean(dchain.MRC[, unique(H1, H2)] %in% meta.mrc[, pangea_id])
+# file.path.rakai1516 <- file.path(indir.deepsequencedata, 'RakaiAll_output_190327_w250_s20_p25_d50_stagetwo_rerun23_min30_conf60_phylogeography_data_with_inmigrants.rda')
+# file.path.chains.data.MRC <- file.path( indir.deepsequence_analyses_MRC, 'MRCPopSample_phsc_stage2_output_newali_250_HKC_phsc', 'MRC_phscnetworks.rda')
+
 # load keys
 anonymisation.keys <- as.data.table(read.csv(file.anonymisation.keys))
 community.keys <- as.data.table( read.csv(file.community.keys) )
-time.first.positive <- as.data.table( read.csv(file.time.first.positive) )
+
+time.first.positive <- as.data.table( read.csv(file.time.first.positive))
+time.first.positive <- make.time.first.positive(time.first.positive)
+
+if(0)
+{
+  # Get all Pangea IDs in the 3 studies
+  all_pangea_ids <- unique(meta.rccs.1[, list(ptid=RCCS_studyid, pangea=Pangea.id)])
+  all_pangea_ids[, ptid:=paste0('RK-', ptid)]
+  tmp <- unique(meta.rccs.2[, list(ptid=pt_id, pangea=pangea_id)])
+  tmp <- rbind(all_pangea_ids, tmp)
+  all_pangea_ids <- unique(tmp)
+  tmp <- unique(meta.mrc[, .(ptid=pt_id, pangea_id)])
+  tmp <- rbind(all_pangea_ids, tmp)
+  all_pangea_ids <- unique(tmp)
+  # Look at the ones that are included in our analysis
+  all_pangea_ids[, list(V1 = gsub('-[0-9]*$','',ptid)), ][,table(V1)]
+  mean(all_pangea_ids[, unique(ptid)] %in% anonymisation.keys[, PT_ID]) # THIS IS STRANGE...
+  mean(anonymisation.keys[, PT_ID] %in% all_pangea_ids[, unique(ptid)])
+  # It is clear that 'all_pangea_ids' does not contain ALL PANGEA IDs in anonymisation.keys... 
+}
+
 
 # get meta data
 meta_data <- get.meta.data(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positive, anonymisation.keys, community.keys)
@@ -71,11 +101,11 @@ print.statements.about.potential.TNet()
 pairs <- pairs.get.meta.data(chain, meta_data)
 
 if(!include.mrc){
-  cat('Keep only pairs in RCCS')
+  cat('Keep only pairs in RCCS\n')
   pairs <- pairs[cohort.RECIPIENT == 'RCCS' & cohort.SOURCE == 'RCCS']
 }
 if(include.only.heterosexual.pairs){
-  cat('Keep only heterosexual pairs')
+  cat('Keep only heterosexual pairs\n')
   pairs <- pairs[(sex.RECIPIENT == 'M' & sex.SOURCE == 'F') | (sex.RECIPIENT == 'F' & sex.SOURCE == 'M')]
 }
 
@@ -103,7 +133,3 @@ stan_data <- add_2D_splines_stan_data(stan_data, spline_degree = 3, n_knots_rows
 tmp <- names(.GlobalEnv)
 tmp <- tmp[!grepl('^.__|^\\.|^model$',tmp)]
 save(list=tmp, file=file.path(outdir.lab, paste0("stanin_",lab,".RData")) )
-
-
-
-

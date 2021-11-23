@@ -14,11 +14,8 @@ stan_model <- '211115'
 lab <- stan_model
 
 outdir.lab <- file.path(outdir, lab); 
-path.to.stan.data <- file.path(outdir.lab, 'input.rda')
 path.to.stan.model <- file.path(indir, 'stan_models', paste0('gp_', stan_model, '.stan'))
 
-
-load(path.to.stan.data)
 source(file.path(indir, 'functions', 'stan_utils.R'))
 
 # stan data

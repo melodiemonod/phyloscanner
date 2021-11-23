@@ -282,6 +282,7 @@ prepare_stan_data <- function(pairs, age_map){
   tmp <- tmp[, list(count = .N), by = c('age_infection.SOURCE', 'age_infection.RECIPIENT')]
   tmp <- merge(age_map, tmp, by = c('age_infection.SOURCE', 'age_infection.RECIPIENT'), all.x = T)
   tmp[is.na(count), count := 0]
+  setkey(tmp, age_infection.RECIPIENT, age_infection.SOURCE)
   stopifnot(sum(tmp$count) == nrow(pairs[sex.SOURCE == 'F' & sex.RECIPIENT == 'M']))
   stopifnot(all(tmp$age_infection.SOURCE == age_map$age_infection.SOURCE))
   stopifnot(all(tmp$age_infection.RECIPIENT == age_map$age_infection.RECIPIENT))
@@ -294,6 +295,7 @@ prepare_stan_data <- function(pairs, age_map){
   tmp <- tmp[, list(count = .N), by = c('age_infection.SOURCE', 'age_infection.RECIPIENT')]
   tmp <- merge(age_map, tmp, by = c('age_infection.SOURCE', 'age_infection.RECIPIENT'), all.x = T)
   tmp[is.na(count), count := 0]
+  setkey(tmp, age_infection.RECIPIENT, age_infection.SOURCE)
   stopifnot(sum(tmp$count) == nrow(pairs[sex.SOURCE == 'M' & sex.RECIPIENT == 'F']))
   stopifnot(all(tmp$age_infection.SOURCE == age_map$age_infection.SOURCE))
   stopifnot(all(tmp$age_infection.RECIPIENT == age_map$age_infection.RECIPIENT))

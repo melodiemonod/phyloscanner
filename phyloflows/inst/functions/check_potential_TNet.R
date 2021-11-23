@@ -45,6 +45,8 @@ print.statements.about.potential.TNet <- function()
 }
 
 
+
+
 print.statements.about.potential.TNet.rakai1516 <- function(filename)
 {
   ### Rakai pairs, R15-16 from Phyloscanner's paper
@@ -54,6 +56,9 @@ print.statements.about.potential.TNet.rakai1516 <- function(filename)
   
   # get pairs 
   rtpdm <- as.data.table(rtpdm)
+  # tmp <- grep('POSTERIOR',colnames(rtpdm),value=T)
+  # rtpdm[, lapply(.SD, range), .SDcols = tmp]
+  
   pairs <- rtpdm[, .(FEMALE_RID, MALE_RID, LINK_MF)]
 
   # Translate Pangea IDs in terms of AIDs
@@ -92,6 +97,8 @@ print.statements.about.potential.TNet.rakai1516 <- function(filename)
   table(pairs$same_cluster)
   cat(nrow(pairs), '/', nrow(pairs[same_cluster == TRUE]),  'pairs were classified in the same possible transmission network cluster at least once.\n')
 }
+
+
 
 
 

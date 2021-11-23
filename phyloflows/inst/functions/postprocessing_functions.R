@@ -44,12 +44,12 @@ make_convergence_diagnostics_stats = function(fit, outdir)
   time = sum(rstan::get_elapsed_time(fit))
   
   # save
-  saveRDS(eff_sample_size_cum, file = file.path(outdir, paste0(basename(  outdir ), "-eff_sample_size_cum.rds")))
-  saveRDS(Rhat_cum, file = file.path(outdir, paste0(basename(  outdir ), "-Rhat_cum.rds")))
-  saveRDS(.WAIC, file = file.path(outdir, paste0(basename(  outdir ), "-WAIC.rds")))
-  saveRDS(.LOO, file = file.path(outdir, paste0(basename(  outdir ), "-LOO.rds")))
-  saveRDS(sampler_diagnostics, file = file.path(outdir, paste0(basename(  outdir ), "-sampler_diagnostics.rds")))
-  saveRDS(time, file = file.path(outdir, paste0(basename(  outdir ), "-time_elapsed.rds")))
+  saveRDS(eff_sample_size_cum, file = paste0(outdir, "-eff_sample_size_cum.rds"))
+  saveRDS(Rhat_cum, file = paste0(outdir,  "-Rhat_cum.rds"))
+  saveRDS(.WAIC, file = paste0(outdir, "-WAIC.rds"))
+  saveRDS(.LOO, file = paste0(outdir, "-LOO.rds"))
+  saveRDS(sampler_diagnostics, file = paste0(outdir, "-sampler_diagnostics.rds"))
+  saveRDS(time, file = paste0(outdir, "-time_elapsed.rds"))
   
  
   # return(summary)
@@ -156,7 +156,7 @@ check_rhat <- function(fit) {
     print('  Rhat above 1.1 indicates that the chains very likely have not mixed')
 }
 
-summarise_var_by_age_direction <- function(samples, var, df_direction, df_age, outdir, transform = NULL){
+summarise_var_by_age_direction <- function(samples, var, df_direction, df_age, transform = NULL){
   
   ps <- c(0.5, 0.025, 0.975)
   p_labs <- c('M','CL','CU')
@@ -198,7 +198,7 @@ plot_intensity_PP <- function(intensity_PP, count_data, outdir){
     scale_x_continuous(expand = c(0,0)) + 
     scale_y_continuous(expand = c(0,0)) 
   
-  ggsave(p, file = file.path(outdir, 'intensity_transmission.png'), w = 8, h = 5)
+  ggsave(p, file = paste0(outdir, '-intensity_transmission.png'), w = 8, h = 5)
 }
 
 find_age_source <- function(samples, df_direction, df_age){

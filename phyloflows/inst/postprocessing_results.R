@@ -18,14 +18,14 @@ path.to.stan.output <- file.path(.outdir, lab, paste0(stan_model, '_', lab, '.rd
 
 load(path.to.stan.data)
 indir <- .indir; outdir <- .outdir
-outdir.lab <- file.path(outdir, lab)
+outdir.lab <- file.path(outdir, lab, lab)
 
 source(file.path(indir, 'functions', 'postprocessing_functions.R'))
 
 # table
 df_direction <- data.table(index_direction = 1:2, is_mf = stan_data$is_mf)
 df_direction[, label_direction := ifelse(is_mf == 1, 'Male -> Female', 'Female -> Male')]
-df_age$index_age <- 1:nrow(df_age)
+df_age$index_age <- 1:nrow(df_age); 
 
 # samples 
 fit <- readRDS(path.to.stan.output)
@@ -35,8 +35,13 @@ samples <- rstan::extract(fit)
 make_convergence_diagnostics_stats(fit, outdir.lab)
 
 # intensity of the poisson process
-intensity_PP <- summarise_var_by_age_direction(samples, 'log_lambda', df_direction, df_age, outdir.lab, transform = 'exp')
+intensity_PP <- summarise_var_by_age_direction(samples, 'log_lambda', df_direction, df_age, transform = 'exp')
 count_data <- prepare_count_data(stan_data)
 plot_intensity_PP(intensity_PP, count_data, outdir.lab)
   
+# median age of source
+age_source <- find_age_source(samples, df_direction, df_age)
+  
+
+
 

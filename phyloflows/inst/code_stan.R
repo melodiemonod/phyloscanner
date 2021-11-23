@@ -13,9 +13,10 @@ DEBUG <- F
 stan_model <- '211115'
 lab <- stan_model
 
-path.to.stan.data <- file.path(outdir, 'input.rda')
+outdir.lab <- file.path(outdir, lab); 
+path.to.stan.data <- file.path(outdir.lab, 'input.rda')
 path.to.stan.model <- file.path(indir, 'stan_models', paste0('gp_', stan_model, '.stan'))
-outdir.lab <- file.path(outdir, lab); dir.create(outdir.lab)
+
 
 load(path.to.stan.data)
 source(file.path(indir, 'functions', 'stan_utils.R'))
@@ -45,7 +46,7 @@ if(DEBUG){
 sum = summary(fit)
 sum$summary[which(sum$summary[,9] < 100),]
 
-save(fit,file = file.path(outdir.lab, 'gp_211115.rda'))
+saveRDS(fit,file = file.path(outdir.lab, 'gp_211115.rds'))
 
 
 

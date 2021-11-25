@@ -19,19 +19,19 @@ stan_model <- '211115'
 lab <- stan_model
 
 # file path input
-outdir.lab <- file.path(outdir, lab, lab)
-path.to.stan.data <- file.path(dirname(outdir.lab), paste0("stanin_",lab,".RData"))
-path.to.age.stratification <- file.path(dirname(outdir.lab), 'input_dobs.rda')
-path.to.stan.samples <- file.path(dirname(outdir.lab), 'gp_211115.rds')
+outdir.name <- file.path(outdir, lab, lab)
+path.to.stan.data <- file.path(dirname(outdir.name), paste0("stanin_",lab,".RData"))
+path.to.age.stratification <- file.path(dirname(outdir.name), 'input_dobs.rda')
+path.to.stan.samples <- file.path(dirname(outdir.name), 'gp_211115.rds')
 path.to.phylogeography.data <- file.path(outdir, "RakaiAll_output_190327_w250_s20_p25_d50_stagetwo_rerun23_min30_conf60_phylogeography_data_with_inmigrants.rda")
 
 # file path output 
-path.output.aggregated.age.source.gender	<- paste0(outdir.lab, '-aggregated_bygendersourceage.csv')
-path.output.aggregated.age.source.gender.normgender	<- paste0(outdir.lab, '-aggregated_bygendersourceage_normbygender.csv')
-path.output.aggregated.age.gender <- paste0(outdir.lab, '-aggregated_byagegender.csv')
-path.output.aggregated.age.gender.normgender <- paste0(outdir.lab, '-aggregated_byagegender_normbygender.csv')
-path.output.aggregated.age.gender.normgender.recage <- paste0(outdir.lab, '-aggregated_byagegender_normbygender_recage.csv')
-path.output.aggregated.age.gender.normgender.sourceage <-paste0(outdir.lab, '-aggregated_byagegender_normbygender_sourceage.csv')
+path.output.aggregated.age.source.gender	<- paste0(outdir.name, '-aggregated_bygendersourceage.csv')
+path.output.aggregated.age.source.gender.normgender	<- paste0(outdir.name, '-aggregated_bygendersourceage_normbygender.csv')
+path.output.aggregated.age.gender <- paste0(outdir.name, '-aggregated_byagegender.csv')
+path.output.aggregated.age.gender.normgender <- paste0(outdir.name, '-aggregated_byagegender_normbygender.csv')
+path.output.aggregated.age.gender.normgender.recage <- paste0(outdir.name, '-aggregated_byagegender_normbygender_recage.csv')
+path.output.aggregated.age.gender.normgender.sourceage <-paste0(outdir.name, '-aggregated_byagegender_normbygender_sourceage.csv')
 
 # load
 load(path.to.stan.data)
@@ -209,7 +209,7 @@ ggplot(tmp[TR_SEX=='F',], aes(x=TR_AGE, y=REC_AGE))+
   geom_abline(intercept = 0, slope = 1, color='white', linetype=2)+
   theme(text = element_text(size = 20),legend.text = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
   guides(fill = guide_colorbar(barwidth = 20, barheight = 0.5))
-ggsave(file=paste0(outdir.lab, '-median_flow_plot_fm.pdf'),width = 6.5, height = 7.5)
+ggsave(file=paste0(outdir.name, '-median_flow_plot_fm.pdf'),width = 6.5, height = 7.5)
 
 ggplot(tmp[TR_SEX=='M',], aes(x=TR_AGE, y=REC_AGE))+
   geom_tile(aes(fill = M)) +
@@ -227,7 +227,7 @@ ggplot(tmp[TR_SEX=='M',], aes(x=TR_AGE, y=REC_AGE))+
   geom_abline(intercept = 0, slope = 1, color='white', linetype=2)+
   theme(text = element_text(size = 20),legend.text = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
   guides(fill = guide_colorbar(barwidth = 20, barheight = 0.5))
-ggsave(file=paste0(outdir.lab, '-median_flow_plot_mf.pdf'),width = 6.5, height = 7.5)
+ggsave(file=paste0(outdir.name, '-median_flow_plot_mf.pdf'),width = 6.5, height = 7.5)
 
 
 # 
@@ -244,7 +244,7 @@ ggplot(df[TR_SEX=='M',],aes(TR_AGE,M))+
   theme_bw() +
   theme(text = element_text(size = 20)) +
   labs(x='\n ages of male sources', y='proportions \n')
-ggsave(paste0(outdir.lab, '-sources_mf.pdf'),width=6, height=5)
+ggsave(paste0(outdir.name, '-sources_mf.pdf'),width=6, height=5)
 
 ggplot(df[TR_SEX=='F',],aes(TR_AGE,M))+
   geom_point()+
@@ -254,7 +254,7 @@ ggplot(df[TR_SEX=='F',],aes(TR_AGE,M))+
   theme_bw() +
   theme(text = element_text(size = 20)) +
   labs(x='\n ages of female sources', y='proportions \n')
-ggsave(paste0(outdir.lab, '-source_fm.pdf'),width=6, height=5)
+ggsave(paste0(outdir.name, '-source_fm.pdf'),width=6, height=5)
 
 
 # 
@@ -296,7 +296,7 @@ ggplot(df)+
   labs(x='ages of sources', y='ages of recipients',fill='genders of sources') +
   facet_grid(.~factor(SEX,c('F','M'),c('female-to-male','male-to-female'))) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed")
-ggsave(paste0(outdir.lab, '-recipient_age_by_sourceagegender.pdf'),width=10, height=5.5)
+ggsave(paste0(outdir.name, '-recipient_age_by_sourceagegender.pdf'),width=10, height=5.5)
 
 
 # 
@@ -351,7 +351,7 @@ ggplot(df[SEX=='M',])+
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   labs(x='age of male sources', y='transmissions to \n younger women',
        fill='age differences between \n  male sources and female \n recipients greater than ')
-ggsave(paste0(outdir.lab, '-agediff_mf.pdf'),width=6, height=5)
+ggsave(paste0(outdir.name, '-agediff_mf.pdf'),width=6, height=5)
 
 
 pars <- data.table(read.csv(path.output.aggregated.age.gender))
@@ -403,4 +403,4 @@ ggplot(df[SEX=='F',])+
   geom_hline(yintercept = 0.5, linetype = "dashed") +
   labs(x='age of female sources', y='transmissions to \n younger men',
        fill='age differences between \n  female sources and male \n recipients greater than ')
-ggsave(paste0(outdir.lab, '-agediff_fm.pdf'),width=6, height=5)
+ggsave(paste0(outdir.name, '-agediff_fm.pdf'),width=6, height=5)

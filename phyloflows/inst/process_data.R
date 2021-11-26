@@ -5,7 +5,11 @@ library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(knitr)
-  
+# Needed for Network plot:
+library(grid)
+library(ggtree)
+library(ggnet)
+
 # change as appropriate
 if(dir.exists('~/Box\ Sync/2021/ratmann_deepseq_analyses/'))
 {
@@ -14,19 +18,19 @@ if(dir.exists('~/Box\ Sync/2021/ratmann_deepseq_analyses/'))
   indir.deepsequencedata <- '~/Box\ Sync/2019/ratmann_pangea_deepsequencedata/live/'
   outdir <- '~/Box\ Sync/2021/phyloflows/'
 }
-if(dir.exists('~/Documents/PANGEA2_RCCS1519_UVRI/'))
+if(dir.exists('~/Documents/ratmann_deepseq_analyses'))
 {
   indir.repository <-'~/git/phyloscanner/phyloflows/inst'
-  indir.deepsequence_analyses   <- '~/Documents/PANGEA2_RCCS1519_UVRI/'
+  indir.deepsequence_analyses   <- '~/Documents/ratmann_deepseq_analyses/live/PANGEA2_RCCS1519_UVRI/'
   indir.deepsequence_analyses_MRC   <- '~/Documents/PANGEA2_MRCUVRI'
   indir.deepsequencedata <- '~/Documents/ratmann_pangea_deepsequencedata/'
-  outdir <- '~/Documents/RCCS/outputs'
+  outdir <- '~/Documents/2021/phyloflows'
 }
 
 # indicators 
 include.mrc <- F
 include.only.heterosexual.pairs <- T
-threshold.likely.connected.pairs <- 0.6
+threshold.likely.connected.pairs <- 0.5
 lab <- paste0('MRC_', include.mrc, '_OnlyHTX_', include.only.heterosexual.pairs, '_threshold_', threshold.likely.connected.pairs)
 
 # file paths
@@ -38,7 +42,8 @@ file.anonymisation.keys <- file.path(indir.deepsequence_analyses,'important_anon
 file.community.keys <- file.path(indir.deepsequence_analyses,'community_names.csv')
 file.time.first.positive <- file.path(indir.deepsequencedata, 'PANGEA2_RCCS', '211111_pangea_db_sharing_extract_rakai_age_firstpos_lastneg.csv')
 outdir.lab <- file.path(outdir, lab); dir.create(outdir.lab)
-  
+
+
 # load functions
 source(file.path(indir.repository, 'functions', 'summary_functions.R'))
 source(file.path(indir.repository, 'functions', 'plotting_functions.R'))
@@ -46,7 +51,8 @@ source(file.path(indir.repository, 'functions', 'stan_utils.R'))
 source(file.path(indir.repository, 'functions', 'check_potential_TNet.R'))
 
 # load files
-load(file.path.chains.data)
+chains.env <- new.env()
+load(file.path.chains.data, envir=chains.env)
 load(file.path.meta.data.rccs.1)
 meta.rccs.1 <- as.data.table(rccsData)
 meta.rccs.2 <- as.data.table( read.csv(file.path.meta.data.rccs.2))
@@ -69,30 +75,11 @@ community.keys <- as.data.table( read.csv(file.community.keys) )
 time.first.positive <- as.data.table( read.csv(file.time.first.positive))
 time.first.positive <- make.time.first.positive(time.first.positive)
 
-if(0)
-{
-  # Get all Pangea IDs in the 3 studies
-  all_pangea_ids <- unique(meta.rccs.1[, list(ptid=RCCS_studyid, pangea=Pangea.id)])
-  all_pangea_ids[, ptid:=paste0('RK-', ptid)]
-  tmp <- unique(meta.rccs.2[, list(ptid=pt_id, pangea=pangea_id)])
-  tmp <- rbind(all_pangea_ids, tmp)
-  all_pangea_ids <- unique(tmp)
-  tmp <- unique(meta.mrc[, .(ptid=pt_id, pangea_id)])
-  tmp <- rbind(all_pangea_ids, tmp)
-  all_pangea_ids <- unique(tmp)
-  # Look at the ones that are included in our analysis
-  all_pangea_ids[, list(V1 = gsub('-[0-9]*$','',ptid)), ][,table(V1)]
-  mean(all_pangea_ids[, unique(ptid)] %in% anonymisation.keys[, PT_ID]) # THIS IS STRANGE...
-  mean(anonymisation.keys[, PT_ID] %in% all_pangea_ids[, unique(ptid)])
-  # It is clear that 'all_pangea_ids' does not contain ALL PANGEA IDs in anonymisation.keys... 
-}
-
-
 # get meta data
 meta_data <- get.meta.data(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positive, anonymisation.keys, community.keys)
 
 # get likely transmission pairs
-chain <- keep.likely.transmission.pairs(as.data.table(dchain), threshold.likely.connected.pairs)
+chain <- keep.likely.transmission.pairs(as.data.table(chains.env$dchain), threshold.likely.connected.pairs)
 
 # study whether couple found in previous analyses are included in the same Potential Transmission Network cluster.
 print.statements.about.potential.TNet()
@@ -124,6 +111,51 @@ plot_age_source_recipient(pairs[sex.SOURCE == 'M' & sex.RECIPIENT == 'F'], 'Male
 plot_age_source_recipient(pairs[sex.SOURCE == 'F' & sex.RECIPIENT == 'M'], 'Female -> Male', 'FM', outdir.lab)
 plot_age_source(pairs, outdir.lab)
 
+chains.env$dchain <- as.data.table(chains.env$dchain)
+chains.env$dc <- as.data.table(chains.env$dc)
+
+# Get dchain
+tmp.dchain <- copy(chains.env$dchain)
+tmp.dchain[LINK_21 == 1, `:=` (SOURCE=H2, RECIPIENT=H1)]
+tmp.dchain[LINK_12 == 1, `:=` (SOURCE=H1, RECIPIENT=H2)]
+
+# Only include the pairs we want
+tmp.dchain <- merge(pairs[,.(RECIPIENT,SOURCE, sex.RECIPIENT)], tmp.dchain, by=c('SOURCE', 'RECIPIENT'))
+# check thresholds:
+hist(tmp.dchain[, SCORE_LINKED]);hist(tmp.dchain[, SCORE_DIR_12])
+
+# make it conformable with the plot function arguments (forget about sex etc... atm)
+tmp.dchain[, TYPE := ifelse(LINK_12 ==1, '12', '21')]
+tmp.dchain[,.(IDCLU, H1, H2, TYPE, CATEGORISATION, SCORE_LINKED)]
+
+# get K_EFF from dc 
+tmp <- chains.env$dc[CATEGORISATION == 'close.and.adjacent.cat' & !grepl('not',TYPE),]
+tmp[, `:=` (TYPE=NULL, CNTRL1=NULL, CNTRL2=NULL, CATEGORISATION=NULL, CATEGORICAL_DISTANCE=NULL, SCORE=NULL, PTY_RUN=NULL)]
+tmp.dchain <- merge(tmp.dchain, tmp, by=c('H1', 'H2'))
+
+setnames(tmp.dchain, c('H1', 'H2', 'K_EFF', 'SCORE_LINKED'), c('ID1', 'ID2', 'KEFF', 'POSTERIOR_SCORE'))
+
+df <- unique(tmp.dchain[, .(IDCLU, ID1, ID2, TYPE, KEFF, POSTERIOR_SCORE)])
+
+di <- data.table(ID = df[, unique( c(ID1,ID2))])
+di <- merge(di, pairs[, .(RECIPIENT, sex.RECIPIENT)], by.x='ID' , by.y='RECIPIENT', all.x=TRUE)
+di <- unique(merge(di, pairs[, .(SOURCE, sex.SOURCE)], by.x='ID' , by.y='SOURCE', all.x=TRUE))
+di[, NODE_FILL:=na.omit(c(sex.RECIPIENT, sex.SOURCE))[1], by=ID]
+di[, `:=`(sex.RECIPIENT=NULL, sex.SOURCE=NULL)]
+di[, `:=` (NODE_LABEL=ID, NODE_SHAPE=NODE_FILL)]
+
+# plot transmission Network:
+DF <- copy(df)
+tmp <- df[, .N, by = IDCLU][N > 3,IDCLU]
+df <- df[IDCLU %in% tmp]
+di <- di[ID %in% df[, unique(c(ID1,ID2))] ]
+
+# load('tmp.RData')
+di <- as.data.table(di)
+df <- as.data.table(df)
+
+# Unfortunately have to run 'manually' at the moment. Need to understand what s wrong with this one.
+# phsc.plot.transmission.network(copy(df), copy(di))
 
 # prepare stan data
 stan_data <- prepare_stan_data(pairs, df_age)

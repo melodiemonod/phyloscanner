@@ -30,7 +30,8 @@ if(dir.exists('~/Documents/ratmann_deepseq_analyses'))
 # indicators 
 include.mrc <- F
 include.only.heterosexual.pairs <- T
-threshold.likely.connected.pairs <- 0.5
+threshold.likely.connected.pairs <- 0.6
+date_implementation_UTT <- as.Date('2016-12-01')
 lab <- paste0('MRC_', include.mrc, '_OnlyHTX_', include.only.heterosexual.pairs, '_threshold_', threshold.likely.connected.pairs)
 
 # file paths
@@ -82,39 +83,38 @@ meta_data <- get.meta.data(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positi
 chain <- keep.likely.transmission.pairs(as.data.table(chains.env$dchain), threshold.likely.connected.pairs)
 
 # study whether couple found in previous analyses are included in the same Potential Transmission Network cluster.
-print.statements.about.potential.TNet()
+# commented by Melodie: this gives me an error
+# print.statements.about.potential.TNet()
 
 # merge meta data to source and recipient
-pairs <- pairs.get.meta.data(chain, meta_data)
+pairs.all <- pairs.get.meta.data(chain, meta_data)
 
 if(!include.mrc){
   cat('Keep only pairs in RCCS\n')
-  pairs <- pairs[cohort.RECIPIENT == 'RCCS' & cohort.SOURCE == 'RCCS']
+  pairs.all <- pairs.all[cohort.RECIPIENT == 'RCCS' & cohort.SOURCE == 'RCCS']
 }
 if(include.only.heterosexual.pairs){
   cat('Keep only heterosexual pairs\n')
-  pairs <- pairs[(sex.RECIPIENT == 'M' & sex.SOURCE == 'F') | (sex.RECIPIENT == 'F' & sex.SOURCE == 'M')]
+  pairs.all <- pairs.all[(sex.RECIPIENT == 'M' & sex.SOURCE == 'F') | (sex.RECIPIENT == 'F' & sex.SOURCE == 'M')]
 }
 
-print.statements.about.pairs(copy(pairs), outdir.lab)
+print.statements.about.pairs(copy(pairs.all), outdir.lab)
 
 # keep only pairs with source-recipient with proxy for the time of infection
-pairs <- pairs[!is.na(age_infection.SOURCE) & !is.na(age_infection.RECIPIENT)]
+pairs <- pairs.all[!is.na(age_infection.SOURCE) & !is.na(age_infection.RECIPIENT)]
 
 # prepare age map
 get.age.map(pairs)
 
 # make some explanatory plots
-plot_hist_age_infection(copy(pairs), outdir.lab)
-plot_time_infection(copy(pairs), outdir.lab)
-plot_age_source_recipient(pairs[sex.SOURCE == 'M' & sex.RECIPIENT == 'F'], 'Male -> Female', 'MF', outdir.lab)
-plot_age_source_recipient(pairs[sex.SOURCE == 'F' & sex.RECIPIENT == 'M'], 'Female -> Male', 'FM', outdir.lab)
-plot_age_source(pairs, outdir.lab)
+plot_hist_time_infection(copy(pairs), outdir.lab)
+plot_age_infection_source_recipient(pairs[sex.SOURCE == 'M' & sex.RECIPIENT == 'F'], 'Male -> Female', 'MF', outdir.lab)
+plot_age_infection_source_recipient(pairs[sex.SOURCE == 'F' & sex.RECIPIENT == 'M'], 'Female -> Male', 'FM', outdir.lab)
+plot_CI_age_infection(pairs, outdir.lab)
 
+# Plot transmission network
 chains.env$dchain <- as.data.table(chains.env$dchain)
 chains.env$dc <- as.data.table(chains.env$dc)
-
-# Get dchain
 tmp.dchain <- copy(chains.env$dchain)
 tmp.dchain[LINK_21 == 1, `:=` (SOURCE=H2, RECIPIENT=H1)]
 tmp.dchain[LINK_12 == 1, `:=` (SOURCE=H1, RECIPIENT=H2)]
@@ -122,7 +122,7 @@ tmp.dchain[LINK_12 == 1, `:=` (SOURCE=H1, RECIPIENT=H2)]
 # Only include the pairs we want
 tmp.dchain <- merge(pairs[,.(RECIPIENT,SOURCE, sex.RECIPIENT)], tmp.dchain, by=c('SOURCE', 'RECIPIENT'))
 # check thresholds:
-hist(tmp.dchain[, SCORE_LINKED]);hist(tmp.dchain[, SCORE_DIR_12])
+# hist(tmp.dchain[, SCORE_LINKED]);hist(tmp.dchain[, SCORE_DIR_12])
 
 # make it conformable with the plot function arguments (forget about sex etc... atm)
 tmp.dchain[, TYPE := ifelse(LINK_12 ==1, '12', '21')]
@@ -165,3 +165,4 @@ stan_data <- add_2D_splines_stan_data(stan_data, spline_degree = 3, n_knots_rows
 tmp <- names(.GlobalEnv)
 tmp <- tmp[!grepl('^.__|^\\.|^model$',tmp)]
 save(list=tmp, file=file.path(outdir.lab, paste0("stanin_",lab,".RData")) )
+

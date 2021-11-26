@@ -115,15 +115,13 @@ phsc.plot.transmission.network<- function(df, di, point.size=10, point.size.coup
   # ggsave(paste0(gsub('-', '', Sys.Date()), '_network.png'), p)
 }
 
-plot_age_source_recipient <- function(data, title, lab, outdir){
+plot_age_infection_source_recipient <- function(data, title, lab, outdir){
   
   data <- data[!is.na(age_infection.SOURCE) & !is.na(age_infection.RECIPIENT)]
   data[, `Cohort round recipient` := cohort_round.RECIPIENT]
   data[, `Cohort round source` := cohort_round.SOURCE]
   data[, `Community recipient` := comm.RECIPIENT]
   data[, `Community source` := comm.SOURCE]
-  data[, `Date infection recipient` := (date_first_positive.RECIPIENT - 1) <= as.Date('2017-01-01')]
-  data[, `Date infection source` := (date_first_positive.SOURCE - 1) <= as.Date('2017-01-01')]
   
   # all pairs
   p <- ggplot(data, aes(x = age_infection.SOURCE, y = age_infection.RECIPIENT)) + 
@@ -165,9 +163,9 @@ plot_age_source_recipient <- function(data, title, lab, outdir){
   
   # by age infection round
   p <- ggplot(data, aes(x = age_infection.SOURCE, y = age_infection.RECIPIENT)) + 
-    geom_point(aes(col = `Date infection recipient`)) + 
+    geom_point(aes(col = date_infection_before_UTT.RECIPIENT)) + 
     labs(x = 'Age at infection source', y = 'Age at infection recipient',
-         col = 'Date infection recipient before 2017') +
+         col = 'Date infection recipient before UTT') +
     geom_abline(intercept = 0, slope = 1, linetype = 'dashed', col = 'grey50') + 
     theme_bw() + 
     coord_fixed() +
@@ -233,23 +231,23 @@ plot_hist_age_infection <- function(pairs, outdir){
   return(p)
 }
 
-plot_time_infection <- function(pairs, outdir){
+plot_hist_time_infection <- function(pairs, outdir){
   
   pairs[, `Round source` := cohort_round.SOURCE]
-  p1 <- ggplot(pairs, aes(x = date_first_positive.SOURCE)) + 
+  p1 <- ggplot(pairs, aes(x = date_infection.SOURCE)) + 
     geom_histogram(bins = 30) +
-    facet_wrap(~`Round source`, nrow = 2) +
+    facet_wrap(~`Round source`, nrow = length(unique(pairs$cohort_round.SOURCE))) +
     theme_bw() + 
     labs(x = 'Date of infection source') + 
-    geom_vline(xintercept = as.Date('2017-01-01'), linetype = 'dashed')
+    geom_vline(xintercept = date_implementation_UTT, linetype = 'dashed')
   
   pairs[, `Round recipient` := cohort_round.RECIPIENT]
-  p2 <- ggplot(pairs, aes(x = date_first_positive.RECIPIENT)) + 
+  p2 <- ggplot(pairs, aes(x = date_infection.RECIPIENT)) + 
     geom_histogram(bins = 30) +
-    facet_wrap(~`Round recipient`, nrow = 2) +
+    facet_wrap(~`Round recipient`, nrow = length(unique(pairs$cohort_round.RECIPIENT))) +
     theme_bw() + 
     labs(x = 'Date of infection recipient') + 
-    geom_vline(xintercept = as.Date('2017-01-01'), linetype = 'dashed')
+    geom_vline(xintercept = date_implementation_UTT, linetype = 'dashed')
 
   p <- ggarrange(p1, p2, ncol = 2)
   
@@ -304,10 +302,9 @@ plot_hist_age_infection_diff_threshold <- function(pairs, outdir){
   return(p)
 }
 
-plot_age_source <- function(pairs, outdir){
+plot_CI_age_infection <- function(pairs, outdir){
   
   tmp <- copy(pairs)
-  tmp[, date_infection_before_2017.RECIPIENT := (date_first_positive.RECIPIENT - 1) < as.Date('2017-01-01')]
   tmp[, age_infection.SOURCE := floor(age_infection.SOURCE)]
   tmp[, age_infection.RECIPIENT := floor(age_infection.RECIPIENT)]
   tmp <- merge(tmp, df_age, by = c('age_infection.RECIPIENT', 'age_infection.SOURCE'))
@@ -318,16 +315,16 @@ plot_age_source <- function(pairs, outdir){
   quantile(subset(tmp, sex.SOURCE == 'F' & sex.RECIPIENT == 'M' & age_infection_reduced.RECIPIENT == 46)$age_infection.SOURCE, prob=ps)
   
   tmp = tmp[, list(q= quantile(age_infection.SOURCE, prob=ps, na.rm = T), q_label=p_labs), 
-            by=c('sex.SOURCE', 'sex.RECIPIENT', 'date_infection_before_2017.RECIPIENT', 'age_infection_reduced.RECIPIENT')]	
-  tmp = dcast(tmp, sex.SOURCE + sex.RECIPIENT + date_infection_before_2017.RECIPIENT + age_infection_reduced.RECIPIENT ~ q_label, value.var = "q")
+            by=c('sex.SOURCE', 'sex.RECIPIENT', 'date_infection_before_UTT.RECIPIENT', 'age_infection_reduced.RECIPIENT')]	
+  tmp = dcast(tmp, sex.SOURCE + sex.RECIPIENT + date_infection_before_UTT.RECIPIENT + age_infection_reduced.RECIPIENT ~ q_label, value.var = "q")
   
   subset(tmp, sex.SOURCE == 'F' & sex.RECIPIENT == 'M' & age_infection_reduced.RECIPIENT == 46)
   
   # FM
   tmp1 <- subset(tmp, sex.SOURCE == 'F' & sex.RECIPIENT == 'M') 
   p1 <- ggplot(tmp1, aes(x = age_infection_reduced.RECIPIENT)) + 
-    geom_point(aes(y = M, col = date_infection_before_2017.RECIPIENT), position = position_dodge(1.5)) + 
-    geom_errorbar(aes(ymin = CL, ymax = CU, col = date_infection_before_2017.RECIPIENT), position = position_dodge(1.5), width = 0.2) +
+    geom_point(aes(y = M, col = date_infection_before_UTT.RECIPIENT), position = position_dodge(1.5)) + 
+    geom_errorbar(aes(ymin = CL, ymax = CU, col = date_infection_before_UTT.RECIPIENT), position = position_dodge(1.5), width = 0.2) +
     labs(x = 'Age at infection male recipient', y = 'Age at infection female source', col = 'Date infection of recipient before 2017') +
     geom_abline(intercept = 0, slope = 1, linetype = 'dashed', col = 'grey50') + 
     theme_bw() + 
@@ -337,8 +334,8 @@ plot_age_source <- function(pairs, outdir){
   # MF
   tmp1 <- subset(tmp, sex.SOURCE == 'M' & sex.RECIPIENT == 'F') 
   p2 <- ggplot(tmp1, aes(x = age_infection_reduced.RECIPIENT)) + 
-    geom_point(aes(y = M, col = date_infection_before_2017.RECIPIENT), position = position_dodge(1.5)) + 
-    geom_errorbar(aes(ymin = CL, ymax = CU, col = date_infection_before_2017.RECIPIENT), position = position_dodge(1.5), width = 0.2) +
+    geom_point(aes(y = M, col = date_infection_before_UTT.RECIPIENT), position = position_dodge(1.5)) + 
+    geom_errorbar(aes(ymin = CL, ymax = CU, col = date_infection_before_UTT.RECIPIENT), position = position_dodge(1.5), width = 0.2) +
     labs(x = 'Age at infection female recipient', y = 'Age at infection male source', col = 'Date infection of recipient before 2017') +
     geom_abline(intercept = 0, slope = 1, linetype = 'dashed', col = 'grey50') + 
     theme_bw() + 

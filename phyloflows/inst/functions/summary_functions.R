@@ -59,9 +59,11 @@ get.meta.data <- function(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positiv
   
   # add time first positive
   time.first.positive <- time.first.positive[pt_id %in% unique(meta.rccs$pt_id)]
+  tmp <- time.first.positive[, list(date_first_visit=min(date_first_visit)), by = 'pt_id']
+  time.first.positive <- merge(time.first.positive, tmp, by = c('date_first_visit', 'pt_id'))
   
   # merge
-  meta.rccs <- merge(meta.rccs, time.first.positive[, .(pt_id, age_first_positive, date_first_positive)], by = 'pt_id')
+  meta.rccs <- merge(meta.rccs, time.first.positive[, .(pt_id, age_first_positive, date_first_positive, date_first_visit)], by = 'pt_id')
   meta.rccs <- unique(meta.rccs)
 
   stopifnot(length(unique(meta.rccs$pt_id)) == nrow(meta.rccs))
@@ -70,7 +72,13 @@ get.meta.data <- function(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positiv
   
   #
   # process MRC meta-data
-  meta.mrc <- unique( meta.mrc[, .(pt_id, sex, age_enrol)] ) 
+  meta.mrc <- unique( meta.mrc[, .(pt_id, sex, age_enrol, visit_dt)] ) 
+  
+  # keep first visit
+  meta.mrc[, visit_dt := as.Date(visit_dt, '%Y-%m-%d')]
+  tmp <- meta.mrc[, list(visit_dt = min(visit_dt)), by = 'pt_id']
+  meta.mrc <- merge(meta.mrc, tmp, by = c('visit_dt', 'pt_id'))
+  setnames(meta.mrc, 'visit_dt', 'date_first_visit')
   
   stopifnot(length(unique(meta.mrc$pt_id)) == nrow(meta.mrc))
   cat('There is ', nrow(meta.mrc), ' individuals included in the MRC meta-data\n\n')
@@ -84,9 +92,14 @@ get.meta.data <- function(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positiv
   
   
   # transform variables
-  meta[, age_infection := as.numeric(ifelse(is.na(age_first_positive), age_enrol, age_first_positive)) - 1]
-  cat('There is ', nrow(meta[!is.na(age_infection)]), ' individuals included in the meta-data with proxy for the age at infection\n')
+  meta[, date_infection := date_first_positive - 365]
+  meta[is.na(date_first_positive), date_infection := date_first_visit - 365]
+  meta[, date_infection_before_UTT := date_infection <= date_implementation_UTT]
   
+  meta[, age_infection := as.numeric(age_first_positive) - 1]
+  meta[is.na(age_first_positive) & !is.na(age_enrol), age_infection := as.numeric(age_enrol) - 1]
+  cat('There is ', nrow(meta[!is.na(age_infection)]), ' individuals included in the meta-data with proxy for the age at infection\n')
+
   
   #
   # last changes
@@ -100,10 +113,12 @@ get.meta.data <- function(meta.rccs.1, meta.rccs.2, meta.mrc, time.first.positiv
   meta <- merge(meta, community.keys, by.x = 'comm_num', by.y = 'comm_num_raw', all.x = T)
   
   # keep only variable of interest
-  meta <- meta[, .(pt_id, aid, sex, age_infection, age_first_positive, date_first_positive, age_enrol, cohort_round, cohort, comm)]
+  meta <- meta[, .(pt_id, aid, sex, cohort_round, cohort, comm,
+                   age_infection,  age_first_positive, age_enrol,
+                   date_infection, date_infection_before_UTT, date_first_positive, date_first_visit)]
   
   # remove very young patients (bug?)
-  cat('\nExcluding very young patients"')
+  cat('\nExcluding very young patients')
   print_table(meta[age_infection < 11, .(aid, age_infection)])
   meta <- meta[is.na(age_infection) | age_infection >= 11]
 
@@ -159,8 +174,6 @@ print.statements.about.pairs <- function(pairs, outdir){
   tab <- pairs[, list(count = .N), by = c('comm.SOURCE', 'comm.RECIPIENT')]
   print_table(tab)
   
-  cat('\nPairs by age of infection\n')
-  plot_hist_age_infection(pairs, outdir)
 
 }
 
